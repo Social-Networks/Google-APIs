@@ -1,11 +1,12 @@
 package com.example.googleoauth2;
 
-import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.support.v7.app.ActionBarActivity;
-import android.support.v7.app.ActionBar;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,15 +15,13 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.os.Build;
+import android.widget.Toast;
 
-import com.google.android.gms.auth.GoogleAuthException;
 import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.GooglePlayServicesAvailabilityException;
 import com.google.android.gms.auth.UserRecoverableAuthException;
+import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-
-import java.io.IOException;
 
 public class MainActivity extends ActionBarActivity {
 
@@ -31,6 +30,8 @@ public class MainActivity extends ActionBarActivity {
     static final int REQUEST_CODE_PICK_ACCOUNT = 1000;
     static final int REQUEST_CODE_RECOVER_FROM_AUTH_ERROR = 1001;
     static final int REQUEST_CODE_RECOVER_FROM_PLAY_SERVICES_ERROR = 1002;
+
+    private String mEmail = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,26 +47,46 @@ public class MainActivity extends ActionBarActivity {
         /* TODO: To setup Google Services API, follow Google Services tab -> Setup on Android developer website:
         * http://developer.android.com/google/play-services/setup.html */
         /* TODO:  If your app supports Android 2.2, you must instead install Google Play services for Froyo from the SDK Manager.*/
-         String[] myarr = getAccountNames();
-        Log.i(TAG, "1st index is: " + myarr[0]);
 
-        getTask(this,myarr[0],SCOPE).execute();
+        getUserEmail();
     }
 
 
-    private String[] getAccountNames() {
-        AccountManager mAccountManager = AccountManager.get(this);
 
-        Account[] accounts = mAccountManager.getAccountsByType(
-                GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE);
-
-        String[] names = new String[accounts.length];
-        for (int i = 0; i < names.length; i++) {
-            names[i] = accounts[i].name;
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE_PICK_ACCOUNT) {
+            if (resultCode == RESULT_OK) {
+                mEmail = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+                getUserEmail();
+            } else if (resultCode == RESULT_CANCELED) {
+                Toast.makeText(this, "You must pick an account", Toast.LENGTH_SHORT).show();
+            }
+        } else if ((requestCode == REQUEST_CODE_RECOVER_FROM_AUTH_ERROR ||
+                requestCode == REQUEST_CODE_RECOVER_FROM_PLAY_SERVICES_ERROR)
+                && resultCode == RESULT_OK) {
+            handleAuthorizeResult(resultCode, data);
+            return;
         }
-        return names;
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
+    private void handleAuthorizeResult(int resultCode, Intent data) {
+        if (data == null) {
+            Log.e(TAG, "Unknown error, click the button again");
+            return;
+        }
+        if (resultCode == RESULT_OK) {
+            Log.i(TAG, "Retrying");
+            new GoogleOAuth2Client(this, mEmail, SCOPE).execute();
+            return;
+        }
+        if (resultCode == RESULT_CANCELED) {
+            Log.w(TAG, "User rejected authorization.");
+            return;
+        }
+        Log.e(TAG, "Unknown error, click the button again");
+    }
 
     /**
      * This method is a hook for background threads and async tasks that need to provide the
@@ -97,13 +118,6 @@ public class MainActivity extends ActionBarActivity {
         });
     }
 
-    /**
-     * Note: This approach is for demo purposes only. Clients would normally not get tokens in the
-     * background from a Foreground activity.
-     */
-    private AbstractGetNameTask getTask( MainActivity activity, String email, String scope) {
-                return new GetNameInForeground(activity, email, scope);
-    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -141,4 +155,39 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
+    /** Attempt to get the user name. If the email address isn't known yet,
+     * then call pickUserAccount() method so the user can pick an account.
+     */
+    private void getUserEmail() {
+        if (mEmail == null) {
+            pickUserAccount();
+        } else {
+            if (isDeviceOnline()) {
+                new GoogleOAuth2Client(MainActivity.this, mEmail, SCOPE).execute();
+            } else {
+                Toast.makeText(this, "No network connection available", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    /** Starts an activity in Google Play Services so the user can pick an account */
+    private void pickUserAccount() {
+
+        String[] allowableAccountTypes = new String[]{GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE};
+        boolean isPromptForAccount = true;
+        Intent intent = AccountPicker.newChooseAccountIntent(null, null,
+                allowableAccountTypes, isPromptForAccount, null, null, null, null);
+        startActivityForResult(intent, REQUEST_CODE_PICK_ACCOUNT);
+    }
+
+    /** Checks whether the device currently has a network connection */
+    private boolean isDeviceOnline() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            return true;
+        }
+        return false;
+    }
 }
