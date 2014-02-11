@@ -19,17 +19,19 @@ package com.example.googleoauth2;
 import android.os.AsyncTask;
 import android.util.Log;
 
-import java.io.IOException;
-
 import com.google.android.gms.auth.GoogleAuthException;
 import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.UserRecoverableAuthException;
+import com.google.android.gms.common.GooglePlayServicesClient;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+
+import java.io.IOException;
 
 /**
  * This example shows how to fetch tokens if you are creating a foreground task/activity and handle
  * auth exceptions.
  */
-public class GoogleOAuth2Client extends AsyncTask<Void, Void, Void> {
+public class GoogleOAuth2Client extends AsyncTask<GMailClient, Void, GMailClient> {
 
     private static final String TAG = "GglServ";
     protected MainActivity mActivity;
@@ -37,7 +39,8 @@ public class GoogleOAuth2Client extends AsyncTask<Void, Void, Void> {
     protected String mScope;
     protected String mEmail;
 
-    public String getmToken() {
+    private boolean isTokenExpired ;
+    public String getToken() {
         return mToken;
     }
 
@@ -48,25 +51,42 @@ public class GoogleOAuth2Client extends AsyncTask<Void, Void, Void> {
         this.mScope = scope;
         this.mEmail = email;
 
+        this.isTokenExpired = true;
         mToken = null;
     }
+
     /**
      * Display personalized greeting. This class contains boilerplate code to consume the token but
      * isn't integral to getting the tokens.
      */
     @Override
-    protected Void doInBackground(Void... params) {
+    protected GMailClient doInBackground(GMailClient... params) {
         try {
             mToken = fetchToken();
             if (mToken == null) {
                 // error has already been handled in fetchToken()
                 return null;
-            } else
+            } else{
                 Log.d(TAG, "access token is: " + mToken);
+                isTokenExpired = false;
+            }
         } catch (IOException ex) {
             onError("Following Error occurred, please try again. " + ex.getMessage(), ex);
         }
-        return null;
+        return params[0];
+    }
+
+    @Override
+    protected void onPostExecute(GMailClient gMailClient) {
+        if(gMailClient == null){
+            Log.d(TAG, "mail client object is null, Do nothing");
+        }else {
+            try {
+                gMailClient.sendEmailMsg();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     protected void onError(String msg, Exception e) {
@@ -81,7 +101,7 @@ public class GoogleOAuth2Client extends AsyncTask<Void, Void, Void> {
      * Get a authentication token if one is not available. If the error is not recoverable then
      * it displays the error message on parent activity right away.
      */
-    protected String fetchToken() throws IOException {
+    private String fetchToken() throws IOException {
         try {
             return GoogleAuthUtil.getToken(mActivity, mEmail, mScope);
         } catch (UserRecoverableAuthException userRecoverableException) {
@@ -94,6 +114,11 @@ public class GoogleOAuth2Client extends AsyncTask<Void, Void, Void> {
         return null;
     }
 
+    public boolean isTokenExpired (){
+        /* TODO: To be implemented.
+        * https://developers.google.com/accounts/docs/OAuth2UserAgent#handlingtheresponse */
+        return isTokenExpired;
+     }
 }
 
 

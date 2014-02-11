@@ -14,7 +14,7 @@ repositories {
 
 android {
     compileSdkVersion 19
-    buildToolsVersion "19.0.0"
+    buildToolsVersion '19.0.0'
 
     defaultConfig {
         minSdkVersion 9
@@ -34,9 +34,9 @@ android {
 }
 
 dependencies {
-	compile 'com.android.support:appcompat-v7:+'
-
-    /* To get latest version of Google Play Services that you can use, check official application on Google Play Store:
-    * https://play.google.com/store/apps/details?id=com.google.android.gms&hl=en */
+    compile 'com.android.support:appcompat-v7:+'
     compile 'com.google.android.gms:play-services:4.0.30'
+    compile files('libs/javax.mail.jar')
+    compile files('libs/activation.jar')
+    compile files('libs/additionnal.jar')
 }

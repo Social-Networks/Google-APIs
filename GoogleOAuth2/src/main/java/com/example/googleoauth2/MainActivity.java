@@ -2,10 +2,7 @@ package com.example.googleoauth2;
 
 import android.accounts.AccountManager;
 import android.app.Dialog;
-import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
@@ -17,21 +14,19 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
-import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.GooglePlayServicesAvailabilityException;
 import com.google.android.gms.auth.UserRecoverableAuthException;
-import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 
 public class MainActivity extends ActionBarActivity {
 
     private final String TAG = "GglServ";
-    private static final String   SCOPE = "oauth2:https://www.googleapis.com/auth/userinfo.profile";
+
     static final int REQUEST_CODE_PICK_ACCOUNT = 1000;
     static final int REQUEST_CODE_RECOVER_FROM_AUTH_ERROR = 1001;
     static final int REQUEST_CODE_RECOVER_FROM_PLAY_SERVICES_ERROR = 1002;
 
-    private String mEmail = null;
+    GMailClient mailClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +43,15 @@ public class MainActivity extends ActionBarActivity {
         * http://developer.android.com/google/play-services/setup.html */
         /* TODO:  If your app supports Android 2.2, you must instead install Google Play services for Froyo from the SDK Manager.*/
 
-        getUserEmail();
+        mailClient = new GMailClient(this, REQUEST_CODE_PICK_ACCOUNT);
+
+        /* Get current user email and access token */
+        mailClient.getUserEmail();
+        /*mailClient.obtainAccessToken();*/
+
+        /* Send email message. */
+        /*mailClient.sendEmailMsg("nomiltrials.street@gmail.com","Etmskt","Please help me i've been caught");*/
+
     }
 
 
@@ -57,8 +60,13 @@ public class MainActivity extends ActionBarActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_CODE_PICK_ACCOUNT) {
             if (resultCode == RESULT_OK) {
-                mEmail = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
-                getUserEmail();
+                mailClient.setEmail(data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME));
+                /*mailClient.obtainAccessToken();*/
+                try {
+                    mailClient.sendEmailMsg("nomiltrials.street@gmail.com","Etmskt","Please help me i've been caught");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             } else if (resultCode == RESULT_CANCELED) {
                 Toast.makeText(this, "You must pick an account", Toast.LENGTH_SHORT).show();
             }
@@ -78,7 +86,9 @@ public class MainActivity extends ActionBarActivity {
         }
         if (resultCode == RESULT_OK) {
             Log.i(TAG, "Retrying");
-            new GoogleOAuth2Client(this, mEmail, SCOPE).execute();
+
+            /* Now new account has been added into Account Picker Dialog, obtain relevant access token. */
+            mailClient.obtainAccessToken();
             return;
         }
         if (resultCode == RESULT_CANCELED) {
@@ -154,40 +164,6 @@ public class MainActivity extends ActionBarActivity {
             return rootView;
         }
     }
-
-    /** Attempt to get the user name. If the email address isn't known yet,
-     * then call pickUserAccount() method so the user can pick an account.
-     */
-    private void getUserEmail() {
-        if (mEmail == null) {
-            pickUserAccount();
-        } else {
-            if (isDeviceOnline()) {
-                new GoogleOAuth2Client(MainActivity.this, mEmail, SCOPE).execute();
-            } else {
-                Toast.makeText(this, "No network connection available", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    /** Starts an activity in Google Play Services so the user can pick an account */
-    private void pickUserAccount() {
-
-        String[] allowableAccountTypes = new String[]{GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE};
-        boolean isPromptForAccount = true;
-        Intent intent = AccountPicker.newChooseAccountIntent(null, null,
-                allowableAccountTypes, isPromptForAccount, null, null, null, null);
-        startActivityForResult(intent, REQUEST_CODE_PICK_ACCOUNT);
-    }
-
-    /** Checks whether the device currently has a network connection */
-    private boolean isDeviceOnline() {
-        ConnectivityManager connMgr = (ConnectivityManager)
-                getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-        if (networkInfo != null && networkInfo.isConnected()) {
-            return true;
-        }
-        return false;
-    }
 }
+
+  
